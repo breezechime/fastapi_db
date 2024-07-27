@@ -6,7 +6,7 @@ with open('README.MD', 'r', encoding='utf-8') as f:
 
 setup(
     name='fastapi_db',
-    version='0.1.3',
+    version='0.6.0',
     author='且听风铃、我是指针*、ZDLAY、KYZ',
     author_email='breezechime@163.com',
     description='fastapi使用sqlalchemy任意接口位置获取db上下文，非常安全并可靠。',
