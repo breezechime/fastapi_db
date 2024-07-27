@@ -2,3 +2,6 @@
 **/__pycache__/
 .idea
 test*.py
+build
+dist
+fastapi_db.egg-info
