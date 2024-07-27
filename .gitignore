@@ -1,0 +1,4 @@
+# Ignore the .pytest_cache directory
+**/__pycache__/
+.idea
+test*.py
