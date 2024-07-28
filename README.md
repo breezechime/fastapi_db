@@ -21,6 +21,12 @@
 
 **CRUDModel**：增删改查模型，你一般情况不需要继承它，而是继承Model
 
+## 安装
+
+```shell
+pip install fastapi_db
+```
+
 ## 示例代码
 
 ```python
