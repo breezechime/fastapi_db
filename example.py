@@ -1,12 +1,14 @@
 import random
+
 import uvicorn
 from fastapi import FastAPI
 from sqlalchemy import Column, String, create_engine, Integer
-from fastapi_db import Model, FastAPIDB, ctx, transactional, Propagation, local_transaction
+from fastapi_db import Model, FastAPIDB, ctx, transactional, Propagation, local_transaction, transaction_pop
+
 
 app = FastAPI()
 
-engine = create_engine('sqlite:///test.db')
+engine = create_engine('sqlite:///test.db', echo=False)
 FastAPIDB(app, engine=engine)
 
 
@@ -31,6 +33,7 @@ Base.metadata.create_all(engine)
 def test1():
     """transactional默认会使用父级会话，没有则创建"""
     print(ctx.session)
+    test2()
     # > <sqlalchemy.orm.session.Session object at 0x105a1ab50>
 
 
@@ -38,6 +41,7 @@ def test1():
 def test2():
     """transactional默认会使用父级会话，没有则创建，可以看到和test1的会话是同一个"""
     print(ctx.session)
+    test3()
     # > <sqlalchemy.orm.session.Session object at 0x105a1ab50>
 
 
@@ -48,35 +52,54 @@ def test3():
     # > <sqlalchemy.orm.session.Session object at 0x110727d90>
 
 
-test1()
-test2()
-test3()
+def rollback_ex(err):
+    print('捕捉', err)
 
 
-with local_transaction() as context:
+@transactional(rollback_callback=rollback_ex)
+def service2():
+    User.delete_by_id(1)
 
-    """你会得到是个事务上下文对象, sqlalchemy会话也在其中"""
-    print(context)
-    # TransactionContext(session=<sqlalchemy.orm.session.Session object at 0x1209ea690>,
-    # propagation=Propagation.NEW, isolation=Isolation.DEFAULT, autocommit=True)
+    raise RuntimeError('asd')
 
-    """使用会话查询对象"""
-    users = context.session.query(User).all()
-    print(users)
-    # > [User(id=1, username=asd), User(id=2, username=6891), User(id=3, username=55896), User(id=4, username=74272),
-    # User(id=5, username=96389), User(id=6, username=91287), User(id=7, username=52207)]
 
-    """使用代理器查询对象"""
-    users = ctx.session.query(User).all()
-    print(users)
-    # > [User(id=1, username=asd), User(id=2, username=6891), User(id=3, username=55896), User(id=4, username=74272),
-    # User(id=5, username=96389), User(id=6, username=91287), User(id=7, username=52207)]
+service2()
+# test1()
+
+
+# with local_transaction() as context:
+#
+#     """你会得到是个事务上下文对象, sqlalchemy会话也在其中"""
+#     print(context)
+#     # TransactionContext(session=<sqlalchemy.orm.session.Session object at 0x1209ea690>,
+#     # propagation=Propagation.NEW, isolation=Isolation.DEFAULT, autocommit=True)
+#
+#     """使用会话查询对象"""
+#     users = context.session.query(User).all()
+#     print(users)
+#     # > [User(id=1, username=asd), User(id=2, username=6891), User(id=3, username=55896), User(id=4, username=74272),
+#     # User(id=5, username=96389), User(id=6, username=91287), User(id=7, username=52207)]
+#
+#     """使用代理器查询对象"""
+#     users = ctx.session.query(User).all()
+#     print(users)
+#     # > [User(id=1, username=asd), User(id=2, username=6891), User(id=3, username=55896), User(id=4, username=74272),
+#     # User(id=5, username=96389), User(id=6, username=91287), User(id=7, username=52207)]
 
 
 @app.get('/user')
+@transactional()
 def get_list():
+    service1()
     users = User.query().all()
     return users
+
+
+@transactional()
+def service1():
+    User.delete_by_id(1)
+
+    raise RuntimeError('asd')
 
 
 @app.get('/create')
@@ -91,5 +114,5 @@ def create_user(username: str = None):
     return user
 
 
-# if __name__ == '__main__':
-#     uvicorn.run(app, host='0.0.0.0', port=9001)
+if __name__ == '__main__':
+    uvicorn.run(app, host='0.0.0.0', port=9000)

@@ -1,11 +1,12 @@
-from typing import Type, Union, Dict, List, Optional, Any
+from typing import Type, Union, Dict, List, Optional, Any, Tuple, TypeVar
 from sqlalchemy.orm import Session, declarative_base, Query, InstrumentedAttribute, make_transient
-from .constants import _T, ID
+from .constants import ID, Columns
 from .extensions import ctx
 from .types import IPage
-from .utils import _empty_primary
+from .utils import _empty_primary, _build_order_by_query, _build_columns_query, _build_pagination_query
 
 _Base = declarative_base()
+_T = TypeVar("_T", bound='DeclarativeModel')
 
 
 class DeclarativeModel(_Base):
@@ -47,7 +48,7 @@ class DeclarativeModel(_Base):
             raise RuntimeError(f'找不到主键 {cls.__name__}')
         return primary_column
 
-    def out_session(self) -> None:
+    def expunge(self) -> None:
         """脱离会话"""
         make_transient(self)
 
@@ -61,7 +62,7 @@ class CRUDModel(DeclarativeModel):
 
     def insert(self, flush: bool = True) -> None:
         """插入自身"""
-        _empty_primary(self, self)
+        self.expunge()
         self.session().add(self)
         if flush:
             self.session().flush()
@@ -69,27 +70,39 @@ class CRUDModel(DeclarativeModel):
     @classmethod
     def insert_by_obj(cls: Type[_T], object) -> _T:
         """插入任意对象"""
-        _empty_primary(cls, object)
         return cls(**dict(object)).insert()
 
     @classmethod
     def insert_batch(cls, objects: List[Any]) -> List[_T]:
         """插入分批对象"""
-        results = []
+        results: List[_T] = []
         for obj in objects:
             _empty_primary(cls, object)
             if isinstance(obj, cls):
-                results.append(obj.insert(flush=False))
+                target = obj
             else:
-                results.append(cls(**dict(obj)).insert(flush=False))
+                target = cls(**dict(obj))
+            target.insert(flush=False)
+            results.append(target)
         cls.session().flush()
         return results
 
     """更新"""
 
     @classmethod
-    def update_by_dict(cls):
-        pass
+    def update_by_id(cls, id: ID, values: dict) -> int:
+        """根据ID条件更新"""
+        return cls.query().filter(cls.primary_column() == id).update(values)
+
+    @classmethod
+    def update_batch_ids(cls, ids: List[ID], values: dict) -> int:
+        """根据ID列表条件更新"""
+        return cls.query().filter(cls.primary_column().in_(ids)).update(values)
+
+    @classmethod
+    def update(cls, *expressions, values: dict, **kwargs) -> int:
+        """根据复杂条件更新"""
+        return cls.query().filter(*expressions).filter_by(**kwargs).update(values)
 
     """保存"""
 
@@ -102,74 +115,111 @@ class CRUDModel(DeclarativeModel):
     """读取"""
 
     @classmethod
-    def get(cls, *expressions, **kwargs) -> _T:
-        """根据表达式查询"""
-        return cls.query().filter(*expressions).filter_by(**kwargs).first()
-
-    @classmethod
-    def get_by_id(cls, id: ID, *columns) -> _T:
+    def get_by_id(cls: Type[_T], id: ID, *columns) -> _T:
         """根据ID查询"""
         return cls.query(*columns).filter(cls.primary_column() == id).first()
 
     @classmethod
-    def get_by_dict(cls, values: Dict[str, Any]) -> _T:
-        """根据 values 条件，查询记录"""
-        return cls.query().filter_by(**values).first()
+    def select_one(cls: Type[_T], *expressions, _columns: Columns = None, _order_by=None, **kwargs) -> _T:
+        return cls.get(*expressions, _columns=_columns, _order_by=_order_by, **kwargs)
 
     @classmethod
-    def get_count(cls, *expressions, **kwargs) -> int:
-        """根据 filter 条件，查询总记录数"""
-        return cls.query(cls.primary_column()).filter(*expressions).filter_by(**kwargs).count()
+    def get_one(cls: Type[_T], *expressions, _columns: Columns = None, _order_by=None, **kwargs) -> _T:
+        return cls.get(*expressions, _columns=_columns, _order_by=_order_by, **kwargs)
+
+    @classmethod
+    def get(cls: Type[_T], *expressions, _columns: Columns = None, _order_by=None, **kwargs) -> _T:
+        """根据表达式查询"""
+        query = cls.query(*_build_columns_query(cls, _columns)).filter(*expressions).filter_by(**kwargs)
+        if _order_by is not None:
+            query = _build_order_by_query(query, _order_by)
+        return query.first()
+
+    @classmethod
+    def get_by_dict(cls: Type[_T], values: Dict[str, Any]) -> _T:
+        """根据 values 条件，查询记录"""
+        return cls.query().filter_by(**values).first()
 
     """列表式"""
 
     @classmethod
     def select(
-        cls,
+        cls: Type[_T],
         *expressions,
-        __limit: Optional[int] = None,
-        __offset: Optional[int] = None,
-        __order_by=None,
+        _columns: Columns = None,
+        _limit: Optional[int] = None,
+        _offset: Optional[int] = None,
+        _order_by=None,
         **kwargs
-    ) -> _T:
+    ) -> List[_T]:
         """根据条件查询"""
-        query = cls.query().filter(*expressions).filter_by(**kwargs)
-        if __order_by is not None:
-            query = query.order_by(__order_by)
-        if __limit is not None:
-            query = query.limit(__limit)
-        if __offset is not None:
-            query = query.offset(__offset)
+        query = cls.query(*_build_columns_query(cls, _columns)).filter(*expressions).filter_by(**kwargs)
+        if _order_by is not None:
+            query = _build_order_by_query(query, _order_by)
+        if _limit is not None:
+            query = query.limit(_limit)
+        if _offset is not None:
+            query = query.offset(_offset)
         return query.all()
 
     @classmethod
     def select_page(
-        cls,
+        cls: Type[_T],
         page: IPage,
         *expressions,
-        __order_by=None,
+        _columns: Columns = None,
+        _order_by=None,
         **kwargs
-    ) -> _T:
+    ) -> List[_T]:
         """根据条件查询并分页"""
-        query = cls.query().filter(*expressions).filter_by(**kwargs)
-        if __order_by is not None:
-            query = query.order_by(__order_by)
+        query = cls.query(*_build_columns_query(cls, _columns)).filter(*expressions).filter_by(**kwargs)
+        if _order_by is not None:
+            query = _build_order_by_query(query, _order_by)
+        query = _build_pagination_query(query, page)
         return query.all()
 
     @classmethod
-    def select_all(cls):
+    def select_page_with_count(
+        cls: Type[_T],
+        page: IPage,
+        *expressions,
+        _columns: Columns = None,
+        _order_by=None,
+        **kwargs
+    ) -> Tuple[int, List[_T]]:
+        """根据条件，查询记录（并翻页）(带上count返回)"""
+        query = cls.query(*_build_columns_query(cls, _columns)).filter(*expressions).filter_by(**kwargs)
+        if _order_by is not None:
+            query = _build_order_by_query(query, _order_by)
+        count = query.count()
+        query = _build_pagination_query(query, page)
+        return count, query.all()
+
+    @classmethod
+    def select_all(cls: Type[_T]) -> List[_T]:
         """不加任何条件查询所有"""
         return cls.query().all()
 
     @classmethod
-    def select_batch_ids(cls, ids: List[ID]) -> List[_T]:
+    def select_batch_ids(cls: Type[_T], ids: List[ID]) -> List[_T]:
         """查询（根据ID 批量查询）"""
         return cls.query().filter(cls.primary_column().in_(ids)).all()
 
+    @classmethod
+    def select_count(cls: Type[_T], *expressions, **kwargs) -> int:
+        """根据条件，查询记录数"""
+        return cls.query().filter(*expressions).filter_by(**kwargs).count()
+
     """删除"""
 
+    def delete(self, flush: bool = True) -> None:
+        """删除自身"""
+        self.session().delete(self)
+        if flush:
+            self.session().flush()
+
     @classmethod
-    def delete(cls, *expressions, **kwargs) -> int:
+    def delete_by_expressions(cls, *expressions, **kwargs) -> int:
         """根据表达式删除"""
         return cls.query().filter(*expressions).filter_by(**kwargs).delete()
 
