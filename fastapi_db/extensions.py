@@ -199,9 +199,11 @@ class TransactionManager:
 
             """如果有错误自动回滚"""
             if exc_type is not None:
+                rollback = None
                 if transaction_context.exception_callback is not None:
-                    transaction_context.exception_callback(exc_val)
-                transaction_context.session.rollback()
+                    rollback = transaction_context.exception_callback(exc_val)
+                if rollback is False:
+                    transaction_context.session.rollback()
                 if transaction_context.rollback_callback is not None:
                     transaction_context.rollback_callback(exc_val)
 

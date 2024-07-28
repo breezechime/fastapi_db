@@ -52,15 +52,17 @@ def test3():
     # > <sqlalchemy.orm.session.Session object at 0x110727d90>
 
 
-def rollback_ex(err):
-    print('捕捉', err)
+def handle_rollback_error(err):
+    # 在这里处理事务回滚后的操作
+    print('异常实例', err)
+    # > test rollback
 
 
-@transactional(rollback_callback=rollback_ex)
+@transactional(rollback_callback=handle_rollback_error)
 def service2():
     User.delete_by_id(1)
 
-    raise RuntimeError('asd')
+    raise RuntimeError('test rollback')
 
 
 service2()
