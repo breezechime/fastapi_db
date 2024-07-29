@@ -75,8 +75,7 @@ class FastAPIDB:
         async def db_session_middleware(request: Request, call_next):
             with local_transaction(autocommit=self.autocommit):
                 get_transaction_context().source = 'request'
-                response = await call_next(request)
-            return response
+                return await call_next(request)
 
 
 class FastAPIDBProxy:
@@ -288,17 +287,17 @@ def transactional(
 
     propagation = _deserialize_enum(Propagation, propagation)
     isolation = _deserialize_enum(Isolation, isolation)
-    autocommit = ctx.app.autocommit if autocommit is None else autocommit
 
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
+            _autocommit = ctx.app.autocommit if autocommit is None else autocommit
             try:
                 transaction_context = get_transaction_context()
                 if cover_request_transaction and transaction_context.source == 'request':
                     transaction_context.propagation = propagation
                     transaction_context.isolation = isolation
-                    transaction_context.autocommit = autocommit
+                    transaction_context.autocommit = _autocommit
                     transaction_context.rollback_callback = rollback_callback
                     transaction_context.exception_callback = exception_callback
                     transaction_context.active_isolation(transaction_context.isolation)

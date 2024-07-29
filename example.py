@@ -1,15 +1,26 @@
 import random
 
 import uvicorn
+# from uvicorn import
 from fastapi import FastAPI
 from sqlalchemy import Column, String, create_engine, Integer
-from fastapi_db import Model, FastAPIDB, ctx, transactional, Propagation, local_transaction, transaction_pop
+from starlette.requests import Request
+
+from fastapi_db import Model, FastAPIDB, ctx, transactional, Propagation, FastAPIDBMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 
 app = FastAPI()
 
+print(app)
 engine = create_engine('sqlite:///test.db', echo=False)
-FastAPIDB(app, engine=engine)
+app.add_middleware(FastAPIDBMiddleware, engine=engine)
+# FastAPIDB(app, engine=engine)
+
+# @app.middleware('http')
+# async def db_session_middleware(request: Request, call_next):
+#     print(request)
+#     return await call_next(request)
 
 
 class Base(Model):
@@ -65,7 +76,7 @@ def service2():
     raise RuntimeError('test rollback')
 
 
-service2()
+# service2()
 # test1()
 
 
@@ -90,18 +101,17 @@ service2()
 
 
 @app.get('/user')
-@transactional()
 def get_list():
     service1()
     users = User.query().all()
     return users
 
 
-@transactional()
 def service1():
-    User.delete_by_id(1)
+    pass
+    # User.delete_by_id(1)
 
-    raise RuntimeError('asd')
+    # raise RuntimeError('asd')
 
 
 @app.get('/create')

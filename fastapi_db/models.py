@@ -61,7 +61,15 @@ class CRUDModel(DeclarativeModel):
     """新增"""
 
     def insert(self, flush: bool = True) -> None:
-        """插入自身"""
+        """
+        插入自身
+
+        ```python
+
+        user = User(username=1)
+        user.insert()
+        ```
+        """
         self.expunge()
         self.session().add(self)
         if flush:
@@ -91,17 +99,60 @@ class CRUDModel(DeclarativeModel):
 
     @classmethod
     def update_by_id(cls, id: ID, values: dict) -> int:
-        """根据ID条件更新"""
+        """
+        根据ID条件更新
+
+        Args:
+            id: 主键ID
+            values: 需要更新的数据以字典的形式
+
+        Returns:
+            int 更新条数
+
+        Example:
+            User.update_by_id(1, {
+                User.nickname: '张三'
+            })
+        """
         return cls.query().filter(cls.primary_column() == id).update(values)
 
     @classmethod
     def update_batch_ids(cls, ids: List[ID], values: dict) -> int:
-        """根据ID列表条件更新"""
+        """
+        根据ID列表条件更新
+
+        Args:
+            ids: 主键ID列表
+            values: 需要更新的数据以字典的形式
+
+        Returns:
+            int 更新条数
+
+        Example:
+            User.update_batch_ids([1, 2, 3], {
+                User.nickname: '张三'
+            })
+        """
         return cls.query().filter(cls.primary_column().in_(ids)).update(values)
 
     @classmethod
     def update(cls, *expressions, values: dict, **kwargs) -> int:
-        """根据复杂条件更新"""
+        """
+        根据复杂条件更新
+
+        Args:
+            expressions: where表达式以元祖的形式传递
+            values: 需要更新的数据以字典的形式
+            kwargs: where筛选条件以字典形式传递
+
+        Returns:
+            int 更新条数
+
+        Example:
+            User.update(User.id == 1, id=1, values={
+                User.nickname: '张三'
+            })
+        """
         return cls.query().filter(*expressions).filter_by(**kwargs).update(values)
 
     """保存"""
@@ -116,20 +167,74 @@ class CRUDModel(DeclarativeModel):
 
     @classmethod
     def get_by_id(cls: Type[_T], id: ID, *columns) -> _T:
-        """根据ID查询"""
+        """
+        根据ID查询一条记录
+
+        Args:
+            id: 主键ID
+            columns: 查询字段列表一旦添加返回类型为Row且不可变
+
+        Returns:
+            T 模型对象 | Row 行数据 | None
+
+        Example:
+            User.get_by_id(1, User.id, User.nickname)
+        """
         return cls.query(*columns).filter(cls.primary_column() == id).first()
 
     @classmethod
     def select_one(cls: Type[_T], *expressions, _columns: Columns = None, _order_by=None, **kwargs) -> _T:
+        """
+        根据组合条件查询一条记录，等同于get_one，get
+
+        Args:
+            expressions: where表达式以元祖的形式传递
+            _columns: 查询字段列表一旦添加返回类型为Row且不可变
+            _order_by: 排序字段，支持元祖类型传递
+            kwargs： where筛选条件以字典形式传递
+
+        Returns:
+            T 模型对象 | Row 行数据 | None
+
+        Example:
+            User.select_one(User.id == 1, id=1, _columns=User.id, _order_by=User.id.desc())
+        """
         return cls.get(*expressions, _columns=_columns, _order_by=_order_by, **kwargs)
 
     @classmethod
     def get_one(cls: Type[_T], *expressions, _columns: Columns = None, _order_by=None, **kwargs) -> _T:
+        """根据组合条件查询一条记录，等同于select_one，get
+
+        Args:
+            expressions: where表达式以元祖的形式传递
+            _columns: 查询字段列表一旦添加返回类型为Row且不可变
+            _order_by: 排序字段，支持元祖类型传递
+            kwargs： where筛选条件以字典形式传递
+
+        Returns:
+            T 模型对象 | Row 行数据 | None
+
+        Example:
+            User.select_one(User.id == 1, id=1, _columns=User.id, _order_by=User.id.desc())
+        """
         return cls.get(*expressions, _columns=_columns, _order_by=_order_by, **kwargs)
 
     @classmethod
     def get(cls: Type[_T], *expressions, _columns: Columns = None, _order_by=None, **kwargs) -> _T:
-        """根据表达式查询"""
+        """根据组合条件查询一条记录，等同于select_one，get_one
+
+        Args:
+            expressions: where表达式以元祖的形式传递
+            _columns: 查询字段列表一旦添加返回类型为Row且不可变
+            _order_by: 排序字段，支持元祖类型传递
+            kwargs： where筛选条件以字典形式传递
+
+        Returns:
+            T 模型对象 | Row 行数据 | None
+
+        Example:
+            User.select_one(User.id == 1, id=1, _columns=User.id, _order_by=User.id.desc())
+        """
         query = cls.query(*_build_columns_query(cls, _columns)).filter(*expressions).filter_by(**kwargs)
         if _order_by is not None:
             query = _build_order_by_query(query, _order_by)
@@ -137,7 +242,15 @@ class CRUDModel(DeclarativeModel):
 
     @classmethod
     def get_by_dict(cls: Type[_T], values: Dict[str, Any]) -> _T:
-        """根据 values 条件，查询记录"""
+        """
+        根据 values 条件，查询一条记录
+
+        Args:
+            values: where条件以字典形式传递
+
+        Returns:
+            T 模型对象 | Row 行数据 | None
+        """
         return cls.query().filter_by(**values).first()
 
     """列表式"""
@@ -152,7 +265,23 @@ class CRUDModel(DeclarativeModel):
         _order_by=None,
         **kwargs
     ) -> List[_T]:
-        """根据条件查询"""
+        """
+        根据复杂条件查询所有记录
+
+        Args:
+            expressions: where表达式以元祖的形式传递
+            _columns: 查询字段列表一旦添加返回类型为Row且不可变
+            _limit: 限制数量，设置该字段将最多返回设置的数量
+            _offset: 偏移量，设置该字段将跳过对应数量
+            _order_by: 排序字段，支持元祖类型传递
+            kwargs: where条件以字典形式传递
+
+        Returns:
+            List[T] 列表[模型对象] | List[Row] 列表[行数据] | []
+
+        Example:
+            User.select(User.id == 1, id=1, _columns=User.id, _order_by=User.id.desc(), _limit=1, _offset=1)
+        """
         query = cls.query(*_build_columns_query(cls, _columns)).filter(*expressions).filter_by(**kwargs)
         if _order_by is not None:
             query = _build_order_by_query(query, _order_by)
@@ -171,7 +300,22 @@ class CRUDModel(DeclarativeModel):
         _order_by=None,
         **kwargs
     ) -> List[_T]:
-        """根据条件查询并分页"""
+        """
+        根据复杂条件查询所有记录并分页
+
+        Args:
+            page: IPage子类你可以集成IPage并实现它所需的方法，FastAPIDB就能识别你的分页载荷。
+            expressions: where表达式以元祖的形式传递
+            _columns: 查询字段列表一旦添加返回类型为Row且不可变
+            _order_by: 排序字段，支持元祖类型传递
+            kwargs: where条件以字典形式传递
+
+        Returns:
+            List[T] 列表[模型对象] | List[Row] 列表[行数据] | []
+
+        Example:
+            User.select_page(Page(1, 20), User.id == 1, id=1, _columns=User.id, _order_by=User.id.desc())
+        """
         query = cls.query(*_build_columns_query(cls, _columns)).filter(*expressions).filter_by(**kwargs)
         if _order_by is not None:
             query = _build_order_by_query(query, _order_by)
@@ -187,7 +331,27 @@ class CRUDModel(DeclarativeModel):
         _order_by=None,
         **kwargs
     ) -> Tuple[int, List[_T]]:
-        """根据条件，查询记录（并翻页）(带上count返回)"""
+        """
+        根据复杂条件查询所有记录并查询总记录数量和分页
+
+        Args:
+            page: IPage子类你可以集成IPage并实现它所需的方法，FastAPIDB就能识别你的分页载荷。
+            expressions: where表达式以元祖的形式传递
+            _columns: 查询字段列表一旦添加返回类型为Row且不可变
+            _order_by: 排序字段，支持元祖类型传递
+            kwargs: where条件以字典形式传递
+
+        Returns:
+            Tuple[int, List[T]] | Tuple[int, List[Row]] | 0, []
+
+        Example:
+            count, users = User.select_page_with_count(
+                                Page(1, 20),
+                                id=1,
+                                _columns=User.id,
+                                _order_by=User.id.desc()
+                            )
+        """
         query = cls.query(*_build_columns_query(cls, _columns)).filter(*expressions).filter_by(**kwargs)
         if _order_by is not None:
             query = _build_order_by_query(query, _order_by)
