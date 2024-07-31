@@ -1,5 +1,7 @@
 from typing import Type, Union, Dict, List, Optional, Any, Tuple, TypeVar
 from sqlalchemy.orm import Session, declarative_base, Query, InstrumentedAttribute, make_transient
+from typing_extensions import deprecated
+
 from .constants import ID, Columns
 from .extensions import ctx
 from .types import IPage
@@ -409,6 +411,11 @@ class CRUDModel(DeclarativeModel):
         return cls.query().filter(*expressions).filter_by(**kwargs).count() > 0
 
     @classmethod
+    def exist_by_id(cls, id: ID) -> bool:
+        return cls.query().filter(cls.primary_column() == id).count() > 0
+
+    @classmethod
+    @deprecated('')
     def exit_by_id(cls, id: ID) -> bool:
         return cls.query().filter(cls.primary_column() == id).count() > 0
 
