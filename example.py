@@ -1,26 +1,17 @@
 import random
 
 import uvicorn
-# from uvicorn import
 from fastapi import FastAPI
+from pydantic import BaseModel
 from sqlalchemy import Column, String, create_engine, Integer
-from starlette.requests import Request
 
-from fastapi_db import Model, FastAPIDB, ctx, transactional, Propagation, FastAPIDBMiddleware
-from starlette.middleware.sessions import SessionMiddleware
-
+from fastapi_db import Model, ctx, transactional, Propagation, FastAPIDBMiddleware
 
 app = FastAPI()
 
 print(app)
 engine = create_engine('sqlite:///test.db', echo=False)
 app.add_middleware(FastAPIDBMiddleware, engine=engine)
-# FastAPIDB(app, engine=engine)
-
-# @app.middleware('http')
-# async def db_session_middleware(request: Request, call_next):
-#     print(request)
-#     return await call_next(request)
 
 
 class Base(Model):
@@ -99,9 +90,13 @@ def service2():
 #     # > [User(id=1, username=asd), User(id=2, username=6891), User(id=3, username=55896), User(id=4, username=74272),
 #     # User(id=5, username=96389), User(id=6, username=91287), User(id=7, username=52207)]
 
+class Test(BaseModel):
+
+    name: str
+
 
 @app.get('/user')
-def get_list():
+def get_list(test: Test):
     service1()
     users = User.query().all()
     return users

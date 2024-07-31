@@ -206,8 +206,17 @@ class TransactionManager:
                 if transaction_context.rollback_callback is not None:
                     transaction_context.rollback_callback(exc_val)
 
-            if transaction_context.autocommit:
-                transaction_context.session.commit()
+            """提交可能也会导致错误"""
+            try:
+                if transaction_context.autocommit:
+                    transaction_context.session.commit()
+            except Exception as e:
+                if transaction_context.exception_callback is not None:
+                    transaction_context.exception_callback(exc_val)
+                transaction_context.session.rollback()
+                if transaction_context.rollback_callback is not None:
+                    transaction_context.rollback_callback(exc_val)
+                raise e
 
             transaction_pop(autocommit=False)
 
