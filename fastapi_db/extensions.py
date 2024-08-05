@@ -38,13 +38,16 @@ class FastAPIDB:
     session_factory: Optional[sessionmaker] = None
 
     def __init__(
-         self,
-         app: Optional[FastAPI] = None,
-         datasource_url: Optional[Union[str, URL]] = None,
-         engine: Optional[Engine] = None,
-         engine_kwargs: dict = None,
-         session_kwargs: dict = None,
-         autocommit: bool = True
+        self,
+        app: Optional[FastAPI] = None,
+        datasource_url: Optional[Union[str, URL]] = None,
+        engine: Optional[Engine] = None,
+        engine_kwargs: dict = None,
+        session_kwargs: dict = None,
+        autocommit: bool = True,
+        worker_id: int = 0,
+        datacenter_id: int = 0,
+        epoch: int = 1288834974,
     ) -> None:
         self.app = app
         self.datasource_url = datasource_url
@@ -52,6 +55,9 @@ class FastAPIDB:
         self.autocommit = autocommit
         self.engine_kwargs = engine_kwargs or {}
         self.session_kwargs = session_kwargs or {}
+        self.worker_id = worker_id
+        self.datacenter_id = datacenter_id
+        self.epoch = epoch
 
         if not datasource_url and not engine:
             raise RuntimeError('您需要传递一个datasource_url或一个引擎参数。')
@@ -62,6 +68,9 @@ class FastAPIDB:
             self.engine = engine
 
         self.session_factory = sessionmaker(bind=self.engine, **self.session_kwargs)
+
+        from .snowflake import Snowflake
+        self.snowflake = Snowflake(datacenter_id=datacenter_id, worker_id=worker_id)
         global _extensions
         _extensions = self
 

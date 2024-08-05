@@ -1,6 +1,8 @@
+import time
 from typing import Type, Union, Dict, List, Optional, Any, Tuple, TypeVar
+
+from sqlalchemy import Column, BIGINT, event, BigInteger
 from sqlalchemy.orm import Session, declarative_base, Query, InstrumentedAttribute, make_transient
-from typing_extensions import deprecated
 
 from .constants import ID, Columns
 from .extensions import ctx
@@ -415,7 +417,6 @@ class CRUDModel(DeclarativeModel):
         return cls.query().filter(cls.primary_column() == id).count() > 0
 
     @classmethod
-    @deprecated('')
     def exit_by_id(cls, id: ID) -> bool:
         return cls.query().filter(cls.primary_column() == id).count() > 0
 
@@ -423,3 +424,96 @@ class CRUDModel(DeclarativeModel):
 class Model(CRUDModel):
     """基础模型"""
     __abstract__ = True
+
+
+# class PkMixin(DeclarativeModel):
+#     """主键"""
+#     __abstract__ = True
+#     __id_strategy__ = None
+#
+#     id = Column(BIGINT, primary_key=True, autoincrement=True, default=lambda x: print(x), comment='序号')
+
+
+class AbstractTimeMixin(DeclarativeModel):
+    """抽象时间混合"""
+    __abstract__ = True
+
+    @classmethod
+    def get_created_time_column(cls) -> InstrumentedAttribute: ...
+
+    @classmethod
+    def get_modified_time_column(cls) -> InstrumentedAttribute: ...
+
+
+class AbstractOperateMixin(DeclarativeModel):
+    """抽象操作混合"""
+    __abstract__ = True
+
+    @classmethod
+    def get_created_user_id_column(cls) -> InstrumentedAttribute: ...
+
+    @classmethod
+    def get_modified_user_id_column(cls) -> InstrumentedAttribute: ...
+
+    @classmethod
+    def get_current_user_id(cls) -> Optional[Any]: ...
+
+
+class TimeMixin(AbstractTimeMixin):
+    """时间混合"""
+    __abstract__ = True
+
+    created_time = Column(BigInteger, default=lambda: int(time.time()), nullable=False, index=True, comment='创建时间')
+    modified_time = Column(BigInteger, default=lambda: int(time.time()), nullable=False, comment='修改时间')
+
+    @classmethod
+    def get_created_time_column(cls) -> InstrumentedAttribute:
+        return cls.created_time
+
+    @classmethod
+    def get_modified_time_column(cls) -> InstrumentedAttribute:
+        return cls.modified_time
+
+
+class OperateMixin(AbstractOperateMixin):
+    """操作混合"""
+    __abstract__ = True
+
+    created_user_id = Column(BigInteger, comment='创建人ID')
+    modified_user_id = Column(BigInteger, comment='修改人ID')
+
+    @classmethod
+    def get_created_user_id_column(cls) -> InstrumentedAttribute:
+        return cls.created_user_id
+
+    @classmethod
+    def get_modified_user_id_column(cls) -> InstrumentedAttribute:
+        return cls.modified_user_id
+
+
+@event.listens_for(AbstractOperateMixin, 'before_insert', propagate=True)
+def before_operate_insert(_, __, target: AbstractOperateMixin) -> None:
+    """监听插入"""
+    setattr(target, target.get_created_user_id_column().key, target.get_current_user_id())
+    setattr(target, target.get_modified_user_id_column().key, target.get_current_user_id())
+
+
+@event.listens_for(AbstractOperateMixin, 'before_update', propagate=True)
+def before_operate__update(_, __, target: AbstractOperateMixin):
+    """监听更新"""
+    setattr(target, target.get_modified_user_id_column().key, target.get_current_user_id())
+
+
+@event.listens_for(AbstractTimeMixin, 'before_insert', propagate=True)
+def before_time_insert(_, __, target: AbstractTimeMixin) -> None:
+    """监听插入"""
+    timestamp: int = int(time.time())
+    setattr(target, target.get_created_time_column().key, timestamp)
+    setattr(target, target.get_modified_time_column().key, timestamp)
+
+
+@event.listens_for(AbstractTimeMixin, 'before_update', propagate=True)
+def before_time_update(_, __, target: AbstractTimeMixin):
+    """监听更新"""
+    timestamp: int = int(time.time())
+    setattr(target, target.get_modified_time_column().key, timestamp)

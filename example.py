@@ -1,34 +1,43 @@
 import random
+from typing import Optional, Any
 
-import uvicorn
 from fastapi import FastAPI
 from pydantic import BaseModel
 from sqlalchemy import Column, String, create_engine, Integer
 
-from fastapi_db import Model, ctx, transactional, Propagation, FastAPIDBMiddleware
+from fastapi_db import Model, ctx, transactional, Propagation, FastAPIDB, TimeMixin, local_transaction, OperateMixin
 
 app = FastAPI()
 
-print(app)
 engine = create_engine('sqlite:///test.db', echo=False)
-app.add_middleware(FastAPIDBMiddleware, engine=engine)
+# app.add_middleware(FastAPIDBMiddleware, engine=engine)
+FastAPIDB(app=app, engine=engine)
 
 
 class Base(Model):
     __abstract__ = True
 
 
-class User(Base):
+class User(Base, TimeMixin, OperateMixin):
     __tablename__ = 'user'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String(32), nullable=False, unique=True)
+    nickname = Column(String(32))
 
     def __repr__(self):
         return f"User(id={self.id}, username={self.username})"
 
+    @classmethod
+    def get_current_user_id(cls) -> Optional[Any]:
+        return random.randint(1, 999)
+
 
 Base.metadata.create_all(engine)
+
+with local_transaction():
+    user = User(id=1, username='test1', nickname='李四2')
+    user.save()
 
 
 @transactional()
@@ -121,5 +130,5 @@ def create_user(username: str = None):
     return user
 
 
-if __name__ == '__main__':
-    uvicorn.run(app, host='0.0.0.0', port=9000)
+# if __name__ == '__main__':
+#     uvicorn.run(app, host='0.0.0.0', port=9001)
