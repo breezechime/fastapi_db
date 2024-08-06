@@ -426,12 +426,12 @@ class Model(CRUDModel):
     __abstract__ = True
 
 
-# class PkMixin(DeclarativeModel):
-#     """主键"""
-#     __abstract__ = True
-#     __id_strategy__ = None
-#
-#     id = Column(BIGINT, primary_key=True, autoincrement=True, default=lambda x: print(x), comment='序号')
+class PkMixin(DeclarativeModel):
+    """主键"""
+    __abstract__ = True
+    __id_strategy__ = None
+
+    id = Column(BIGINT, primary_key=True, autoincrement=True, comment='序号')
 
 
 class AbstractTimeMixin(DeclarativeModel):

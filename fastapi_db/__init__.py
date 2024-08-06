@@ -3,7 +3,7 @@ from .transaction_enums import Propagation, Isolation
 from .middleware import FastAPIDBMiddleware
 from .extensions import (FastAPIDB, TransactionContext, local_transaction, set_transaction_context,
                          get_transaction_context, transactional, transaction_pop, ctx)
-from .models import (DeclarativeModel, CRUDModel, Model, TimeMixin, AbstractTimeMixin, PkMixin, OperateMixin,
+from .models import (DeclarativeModel, CRUDModel, Model, TimeMixin, AbstractTimeMixin, OperateMixin,
                      AbstractOperateMixin)
 
 __all__ = [
@@ -25,7 +25,6 @@ __all__ = [
     'AbstractTimeMixin',
     'AbstractOperateMixin',
     'OperateMixin',
-    'PkMixin',
     'IPage',
     'Page',
 ]
